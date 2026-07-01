@@ -4,3 +4,15 @@ build/
 out/
 node_modules/
 dist/
+.idea/
+target/
+logs/
+*.log
+*.tmp
+*.pid
+*.swp
+
+!gradlew
+!gradlew.bat
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
