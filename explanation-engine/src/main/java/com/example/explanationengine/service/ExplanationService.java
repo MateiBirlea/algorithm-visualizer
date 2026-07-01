@@ -148,7 +148,7 @@ public class ExplanationService {
                 - Pentru BITONIC, spune ca pozitiile sunt conectate de reteaua Bitonic in phaseName si mentioneaza comparatorDistance si mergeSize.
                 - Pentru ODD_EVEN, mentioneaza faza oddEvenPhase si passNumber.
                 - Pentru BATCHER_ODD_EVEN_MERGE_SORT, mentioneaza reteaua odd-even merge si mergeSize.
-                - Pentru PAIRWISE_SORTING_NETWORK, mentioneaza etapa pairwise, networkStage si networkSubStage.
+                - Pentru PAIRWISE_SORTING_NETWORK, mentioneaza etapa pairwise, networkStage si networkSubStage; daca phaseName contine NAIVE, spune explicit ca pasul apartine variantei naive implementate.
                 - Pentru BUBBLE_SORTING_NETWORK, mentioneaza passNumber si faptul ca este o comparatie locala intre vecini.
                 - Incheie cu avertizarea despre sortarea globala daca isArrayGloballySortedAfterStep=false.
 
@@ -221,7 +221,7 @@ public class ExplanationService {
                 - Pentru Bitonic, mentioneaza comparatorDistance, mergeSize si phaseName.
                 - Pentru Odd-Even, mentioneaza daca este faza EVEN sau ODD.
                 - Pentru Batcher Odd-Even Merge Sort, mentioneaza reteaua odd-even merge.
-                - Pentru Pairwise Sorting Network, mentioneaza etapa pairwise si networkStage/networkSubStage.
+                - Pentru Pairwise Sorting Network, mentioneaza etapa pairwise si networkStage/networkSubStage; daca phaseName contine NAIVE, mentioneaza ca este varianta naive implementata.
                 - Pentru Bubble Sorting Network, mentioneaza passNumber si comparatia locala dintre vecini.
                 - Daca didSwap=true, explica exact de ce s-a facut swap conform directiei comparatorului.
                 - Daca didSwap=false, explica exact de ce nu s-a facut swap.
@@ -285,6 +285,7 @@ public class ExplanationService {
                 .collect(Collectors.joining("\n"));
         AlgorithmRunResultDto comparisonWinner = minByComparisons(req.getResults());
         AlgorithmRunResultDto swapWinner = minBySwaps(req.getResults());
+        AlgorithmRunResultDto comparisonLoser = maxByComparisons(req.getResults());
         int maxComparisons = maxComparisons(req.getResults());
         int minComparisons = minComparisons(req.getResults());
         int maxSwaps = maxSwaps(req.getResults());
@@ -314,6 +315,7 @@ public class ExplanationService {
                 Calcule comparative deja verificate:
                 - castigatorComparatii: %s
                 - castigatorSwapuri: %s
+                - celeMaiMulteComparatii: %s
                 - diferentaComparatiiProcente: %.2f%%
                 - diferentaSwapuriProcente: %.2f%%
 
@@ -325,6 +327,7 @@ public class ExplanationService {
                 - TIMP_MS: %s
                 - CASTIGATOR_COMPARATII: %s
                 - CASTIGATOR_SWAP_URI: %s
+                - CELE_MAI_MULTE_COMPARATII: %s = %d
                 - DIFERENTA_COMPARATII: (%d - %d) / %d * 100 = %.2f%%
                 - DIFERENTA_SWAP_URI: (%d - %d) / %d * 100 = %.2f%%
 
@@ -336,6 +339,11 @@ public class ExplanationService {
                 - Pentru fiecare metrica, afiseaza valoarea pe fiecare algoritm: BITONIC = X, ODD_EVEN = Y.
                 - Concluzia trebuie sa compare algoritmii intre ei si sa fie bazata strict pe results.
                 - Nu inventa informatii despre algoritmi, distributia datelor sau recomandari generale.
+                - Nu spune ca un algoritm este eficient la comparatii daca totalComparisons este mai mare decat la alt algoritm.
+                - Castigatorul la comparatii este exclusiv algoritmul cu totalComparisons minim.
+                - Castigatorul la swap-uri este exclusiv algoritmul cu totalSwaps minim.
+                - Mentioneaza explicit algoritmul cu cele mai multe comparatii.
+                - Daca PAIRWISE_SORTING_NETWORK are valoarea maxima la comparatii, spune ca este cel mai slab la criteriul comparatii pentru aceasta rulare.
                 - Daca algorithmName este diferit de executedAs, mentioneaza explicit ca rezultatul nu este valid comparativ.
 
                 FORMAT OBLIGATORIU:
@@ -346,6 +354,7 @@ public class ExplanationService {
                 TIMP_MS: <ALGORITM = executionTimeMs pentru fiecare rezultat>
                 CASTIGATOR_COMPARATII: <algoritmul cu cele mai putine comparatii>
                 CASTIGATOR_SWAP_URI: <algoritmul cu cele mai putine swap-uri>
+                CELE_MAI_MULTE_COMPARATII: <algoritmul cu cele mai multe comparatii si valoarea>
                 DIFERENTA_COMPARATII: <formula (max-min)/max*100 si procentul calculat>
                 DIFERENTA_SWAP_URI: <formula (max-min)/max*100 si procentul calculat>
                 CONCLUZIE_COMPARATIVA: <concluzie bazata pe toate rezultatele din lista>
@@ -357,6 +366,7 @@ public class ExplanationService {
                 resultLines,
                 comparisonWinner == null ? "N/A" : comparisonWinner.getAlgorithmName(),
                 swapWinner == null ? "N/A" : swapWinner.getAlgorithmName(),
+                comparisonLoser == null ? "N/A" : comparisonLoser.getAlgorithmName(),
                 comparisonDiffPercent,
                 swapDiffPercent,
                 algorithmNames,
@@ -366,6 +376,8 @@ public class ExplanationService {
                 timeLine,
                 comparisonWinner == null ? "N/A" : comparisonWinner.getAlgorithmName(),
                 swapWinner == null ? "N/A" : swapWinner.getAlgorithmName(),
+                comparisonLoser == null ? "N/A" : comparisonLoser.getAlgorithmName(),
+                maxComparisons,
                 maxComparisons,
                 minComparisons,
                 maxComparisons,
@@ -536,6 +548,7 @@ public class ExplanationService {
     private String formatComparativeAnalysisResponse(ComparativeAnalysisRequestDto req, String aiReply) {
         AlgorithmRunResultDto comparisonWinner = minByComparisons(req.getResults());
         AlgorithmRunResultDto swapWinner = minBySwaps(req.getResults());
+        AlgorithmRunResultDto comparisonLoser = maxByComparisons(req.getResults());
         int maxComparisons = maxComparisons(req.getResults());
         int minComparisons = minComparisons(req.getResults());
         int maxSwaps = maxSwaps(req.getResults());
@@ -549,10 +562,11 @@ public class ExplanationService {
         String conclusion = buildDeterministicComparativeConclusion(
                 comparisonWinner,
                 swapWinner,
+                comparisonLoser,
+                req.getResults(),
                 comparisonDiffPercent,
                 swapDiffPercent,
-                mismatchWarning,
-                aiReply
+                mismatchWarning
         );
 
         return """
@@ -563,6 +577,7 @@ public class ExplanationService {
                 TIMP_MS: %s
                 CASTIGATOR_COMPARATII: %s
                 CASTIGATOR_SWAP_URI: %s
+                CELE_MAI_MULTE_COMPARATII: %s = %d
                 DIFERENTA_COMPARATII: (%d - %d) / %d * 100 = %.2f%%
                 DIFERENTA_SWAP_URI: (%d - %d) / %d * 100 = %.2f%%
                 CONCLUZIE_COMPARATIVA: %s
@@ -574,6 +589,8 @@ public class ExplanationService {
                 comparativeMetricLine(req.getResults(), result -> result.getExecutionTimeMs().toString()),
                 comparisonWinner == null ? "N/A" : comparisonWinner.getAlgorithmName(),
                 swapWinner == null ? "N/A" : swapWinner.getAlgorithmName(),
+                comparisonLoser == null ? "N/A" : comparisonLoser.getAlgorithmName(),
+                maxComparisons,
                 maxComparisons,
                 minComparisons,
                 maxComparisons,
@@ -589,23 +606,29 @@ public class ExplanationService {
     private String buildDeterministicComparativeConclusion(
             AlgorithmRunResultDto comparisonWinner,
             AlgorithmRunResultDto swapWinner,
+            AlgorithmRunResultDto comparisonLoser,
+            List<AlgorithmRunResultDto> results,
             double comparisonDiffPercent,
             double swapDiffPercent,
-            String mismatchWarning,
-            String aiReply
+            String mismatchWarning
     ) {
         String base = "Comparatia foloseste toate rezultatele din lista: "
                 + "castigator la comparatii este " + (comparisonWinner == null ? "N/A" : comparisonWinner.getAlgorithmName())
                 + ", iar castigator la swap-uri este " + (swapWinner == null ? "N/A" : swapWinner.getAlgorithmName())
-                + ". Diferenta este de %.2f%% la comparatii si %.2f%% la swap-uri.".formatted(comparisonDiffPercent, swapDiffPercent);
+                + ". Algoritmul cu cele mai multe comparatii este " + (comparisonLoser == null ? "N/A" : comparisonLoser.getAlgorithmName())
+                + " cu " + (comparisonLoser == null ? 0 : comparisonLoser.getTotalComparisons()) + " comparatii."
+                + " Diferenta este de %.2f%% la comparatii si %.2f%% la swap-uri.".formatted(comparisonDiffPercent, swapDiffPercent);
+        String identicalStats = identicalStatisticsGroups(results);
+        if (!identicalStats.isBlank()) {
+            base += " Statistici identice detectate: " + identicalStats + ".";
+        }
+        if (comparisonLoser != null && "PAIRWISE_SORTING_NETWORK".equals(comparisonLoser.getAlgorithmName())) {
+            base += " PAIRWISE_SORTING_NETWORK este cel mai slab la criteriul comparatii pentru aceasta rulare, deoarece are valoarea maxima.";
+        }
         if (mismatchWarning != null && !mismatchWarning.isBlank()) {
             return base + " Atentie: exista mapping invalid (" + mismatchWarning + "), deci comparatia nu trebuie considerata finala.";
         }
-        String aiConclusion = extractAnalysisValue(aiReply, "CONCLUZIE_COMPARATIVA");
-        if (aiConclusion.isBlank()) {
-            return base;
-        }
-        return base + " Observatie AI: " + aiConclusion;
+        return base;
     }
 
     private String extractAnalysisValue(String text, String expectedKey) {
@@ -642,6 +665,25 @@ public class ExplanationService {
         return results.stream()
                 .min((left, right) -> Integer.compare(left.getTotalSwaps(), right.getTotalSwaps()))
                 .orElse(null);
+    }
+
+    private AlgorithmRunResultDto maxByComparisons(List<AlgorithmRunResultDto> results) {
+        return results.stream()
+                .max((left, right) -> Integer.compare(left.getTotalComparisons(), right.getTotalComparisons()))
+                .orElse(null);
+    }
+
+    private String identicalStatisticsGroups(List<AlgorithmRunResultDto> results) {
+        return results.stream()
+                .collect(Collectors.groupingBy(
+                        result -> result.getTotalComparisons() + "/" + result.getTotalSwaps() + "/" + result.getTotalSteps(),
+                        Collectors.mapping(AlgorithmRunResultDto::getAlgorithmName, Collectors.toList())
+                ))
+                .values()
+                .stream()
+                .filter(names -> names.size() > 1)
+                .map(names -> String.join(" si ", names))
+                .collect(Collectors.joining("; "));
     }
 
     private int minComparisons(List<AlgorithmRunResultDto> results) {

@@ -100,12 +100,39 @@ class AlgoServiceApplicationTests {
         assertThat(signatures).hasSizeGreaterThan(1);
     }
 
+    @Test
+    void pairwiseImplementationIsMarkedAsNaiveWhenUsingCleanupComparators() {
+        SortingNetworkServiceImpl service = new SortingNetworkServiceImpl();
+        List<Integer> values = IntStream.rangeClosed(1, 50)
+                .map(i -> (i * 37) % 101)
+                .boxed()
+                .toList();
+
+        SortingNetworkExecuteResponseDto pairwise = service.execute(requestFor(values, SortingNetworkAlgorithm.PAIRWISE_SORTING_NETWORK, SortDirection.ASC));
+        SortingNetworkExecuteResponseDto oddEven = service.execute(requestFor(values, SortingNetworkAlgorithm.ODD_EVEN, SortDirection.ASC));
+
+        assertThat(pairwise.getSteps()).isNotEmpty();
+        assertThat(pairwise.getSteps())
+                .allSatisfy(step -> assertThat(step.getPhaseName()).startsWith("PAIRWISE_NAIVE"));
+        assertThat(pairwise.getMetrics().getTotalComparisons())
+                .isGreaterThan(oddEven.getMetrics().getTotalComparisons());
+    }
+
     private SortingNetworkExecuteRequestDto requestFor(SortingNetworkAlgorithm algorithm, boolean forceRequestedAlgorithm) {
         SortingNetworkExecuteRequestDto request = new SortingNetworkExecuteRequestDto();
         request.setValues(IntStream.rangeClosed(1, 50).boxed().toList());
         request.setAlgorithm(algorithm);
         request.setDirection(SortDirection.DESC);
         request.setForceRequestedAlgorithm(forceRequestedAlgorithm);
+        return request;
+    }
+
+    private SortingNetworkExecuteRequestDto requestFor(List<Integer> values, SortingNetworkAlgorithm algorithm, SortDirection direction) {
+        SortingNetworkExecuteRequestDto request = new SortingNetworkExecuteRequestDto();
+        request.setValues(new ArrayList<>(values));
+        request.setAlgorithm(algorithm);
+        request.setDirection(direction);
+        request.setForceRequestedAlgorithm(true);
         return request;
     }
 

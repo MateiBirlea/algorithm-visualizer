@@ -286,7 +286,7 @@ function defaultPhaseFor(algorithm: Algorithm, stageIndex: number) {
     return 'ODD_EVEN_MERGE';
   }
   if (algorithm === 'PAIRWISE_SORTING_NETWORK') {
-    return stageIndex === 0 ? 'PAIRWISE_COMPARE' : 'PAIRWISE_MERGE';
+    return stageIndex === 0 ? 'PAIRWISE_NAIVE_COMPARE' : 'PAIRWISE_NAIVE_MERGE';
   }
   if (algorithm === 'BUBBLE_SORTING_NETWORK') {
     return 'BUBBLE_PASS';
@@ -452,6 +452,7 @@ function getAnalysisFields(text: string, type: 'single' | 'comparative'): Array<
       'TIMP_MS',
       'CASTIGATOR_COMPARATII',
       'CASTIGATOR_SWAP_URI',
+      'CELE_MAI_MULTE_COMPARATII',
       'DIFERENTA_COMPARATII',
       'DIFERENTA_SWAP_URI',
       'CONCLUZIE_COMPARATIVA',

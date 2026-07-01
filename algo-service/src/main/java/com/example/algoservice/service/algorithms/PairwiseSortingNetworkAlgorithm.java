@@ -15,7 +15,7 @@ public class PairwiseSortingNetworkAlgorithm extends AbstractSortingNetworkAlgor
 
         for (int i = 0; i + 1 < n; i += 2) {
             compareAndRecord(values, i, i + 1, direction, stage, i / 2,
-                    "PAIRWISE_COMPARE", 2, null, "Pairwise compare", steps, stepCounter);
+                    "PAIRWISE_NAIVE_COMPARE", 2, null, "Pairwise naive compare", steps, stepCounter);
         }
 
         for (int blockSize = 4; blockSize < n * 2; blockSize *= 2) {
@@ -33,7 +33,7 @@ public class PairwiseSortingNetworkAlgorithm extends AbstractSortingNetworkAlgor
         for (int gap = initialGap; gap >= 1; gap /= 2) {
             for (int i = start; i + gap < end; i++) {
                 compareAndRecord(values, i, i + gap, direction, stage, gap,
-                        "PAIRWISE_MERGE", mergeSize, null, "Pairwise merge", steps, stepCounter);
+                        "PAIRWISE_NAIVE_MERGE", mergeSize, null, "Pairwise naive merge", steps, stepCounter);
             }
         }
     }
@@ -43,7 +43,7 @@ public class PairwiseSortingNetworkAlgorithm extends AbstractSortingNetworkAlgor
         for (int i = start + 1; i < end; i++) {
             for (int j = i; j > start; j--) {
                 compareAndRecord(values, j - 1, j, direction, stage, j - start,
-                        "PAIRWISE_MERGE", mergeSize, null, "Pairwise merge cleanup", steps, stepCounter);
+                        "PAIRWISE_NAIVE_CLEANUP", mergeSize, null, "Pairwise naive insertion cleanup", steps, stepCounter);
             }
         }
     }
