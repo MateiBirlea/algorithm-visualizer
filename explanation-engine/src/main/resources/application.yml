@@ -1,0 +1,18 @@
+server:
+  port: ${SERVER_PORT:8083}
+
+ollama:
+  base-url: ${OLLAMA_BASE_URL:http://host.docker.internal:11434}
+  model: ${OLLAMA_MODEL:llama3.2}
+  system-prompt: |
+    You are an algorithm tutor. Explain each sorting network comparator step briefly, in Romanian, using simple terms.
+    Mention which indices are compared, whether a swap happened, and why that decision keeps the partial order correct.
+    Keep answers to 2-4 concise sentences.
+
+spring:
+  application:
+    name: explanation-engine
+
+logging:
+  level:
+    root: INFO
