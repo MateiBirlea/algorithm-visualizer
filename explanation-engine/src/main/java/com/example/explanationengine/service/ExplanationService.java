@@ -52,7 +52,7 @@ public class ExplanationService {
         long start = System.currentTimeMillis();
         String reply = ollamaClient.chat(userPrompt);
         long end = System.currentTimeMillis();
-        return new ExplanationResponse(reply, properties.model(), end - start);
+        return new ExplanationResponse(formatSingleAlgorithmAnalysisResponse(request, reply), properties.model(), end - start);
     }
 
     public ExplanationResponse analyzeComparative(ComparativeAnalysisRequestDto request) {
@@ -542,6 +542,50 @@ public class ExplanationService {
                 r.getExecutionTimeMs(),
                 Boolean.TRUE.equals(r.getCorrectlySorted()),
                 r.getFinalArray()
+        );
+    }
+
+    private String formatSingleAlgorithmAnalysisResponse(SingleAlgorithmAnalysisRequestDto req, String aiReply) {
+        RunAnalysisResultDto result = req.getResult();
+        String algorithmName = valueOr(result.getAlgorithmName(), result.getAlgorithm(), "N/A");
+        int actualComparisons = result.getActualComparisons() == null ? result.getTotalComparisons() : result.getActualComparisons();
+        String theoreticalComparisons = result.getTheoreticalComparisons() == null ? "N/A" : result.getTheoreticalComparisons().toString();
+        boolean comparisonMatch = result.getComparisonMatch() == null
+                ? result.getTheoreticalComparisons() != null && result.getTheoreticalComparisons().equals(actualComparisons)
+                : Boolean.TRUE.equals(result.getComparisonMatch());
+        boolean sortedCorrectly = Boolean.TRUE.equals(
+                result.getCorrectlySorted() == null ? result.getIsFinalArraySortedCorrectly() : result.getCorrectlySorted()
+        );
+        String conclusion = extractAnalysisValue(aiReply, "CONCLUZIE_STATISTICA");
+        if (conclusion.isBlank()) {
+            conclusion = "Rularea curenta pentru " + algorithmName
+                    + " a executat " + result.getTotalSteps()
+                    + " pasi, " + actualComparisons
+                    + " comparatii si " + result.getTotalSwaps()
+                    + " swap-uri. Verificarea comparatiilor "
+                    + (comparisonMatch ? "coincide cu valoarea teoretica transmisa in DTO." : "difera de valoarea teoretica transmisa in DTO.");
+        }
+
+        return """
+                ALGORITM: %s
+                TIMP_MS: %d
+                PASI_TOTALI: %d
+                SWAPURI_EXECUTATE: %d
+                SORTARE_CORECTA: %s
+                COMPARATII_TEORETICE: %s
+                COMPARATII_EXECUTATE: %d
+                STATUS: %s
+                CONCLUZIE_STATISTICA: %s
+                """.formatted(
+                algorithmName,
+                result.getExecutionTimeMs(),
+                result.getTotalSteps(),
+                result.getTotalSwaps(),
+                sortedCorrectly ? "DA" : "NU",
+                theoreticalComparisons,
+                actualComparisons,
+                comparisonMatch ? "Coincid" : "Difera",
+                conclusion
         );
     }
 
