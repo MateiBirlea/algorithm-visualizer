@@ -551,6 +551,7 @@ function App() {
   const [runs, setRuns] = useState<Record<Algorithm, AlgorithmRun>>(() => createInitialRuns());
   const [lastRunMode, setLastRunMode] = useState<'single' | 'parallel'>('single');
   const [selectedViewAlgorithm, setSelectedViewAlgorithm] = useState<Algorithm>('BITONIC');
+  const [inspectStepByAlgorithm, setInspectStepByAlgorithm] = useState<Partial<Record<Algorithm, number>>>({});
   const [currentStep, setCurrentStep] = useState(0);
   const [highestReachedStep, setHighestReachedStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -621,6 +622,7 @@ function App() {
     if (!isExecutionStopped) {
       return;
     }
+    setInspectStepByAlgorithm({});
     setCurrentStep(0);
     setHighestReachedStep(0);
     setIsPlaying(false);
@@ -1523,6 +1525,7 @@ function App() {
     setUploadedFileName(file.name);
     setStatus(`Fisier incarcat: ${file.name}`);
     setRuns(createInitialRuns());
+    setInspectStepByAlgorithm({});
     setCurrentStep(0);
     setHighestReachedStep(0);
     setIsPlaying(false);
@@ -1591,6 +1594,7 @@ function App() {
       });
       setRuns(next);
       setLastRunMode('parallel');
+      setInspectStepByAlgorithm({});
       setCurrentStep(0);
       setHighestReachedStep(0);
       setIsPlaying(true);
@@ -1658,6 +1662,7 @@ function App() {
       setRuns(next);
       setActiveSingleAlgorithm(selectedAlgorithm);
       setLastRunMode('single');
+      setInspectStepByAlgorithm({});
       setCurrentStep(0);
       setHighestReachedStep(0);
       setIsPlaying(true);
@@ -1687,10 +1692,25 @@ function App() {
     setInspectNotice('Executia a fost pusa pe pauza pentru inspectare.');
   }
 
+  function goToAlgorithmStep(algorithm: Algorithm, index: number, limit: number) {
+    const clamped = Math.min(Math.max(index, 0), Math.max(limit, 0));
+    const runFinishedWhileOthersRun = isPlaying && runs[algorithm].steps.length > 0 && currentStep >= runs[algorithm].steps.length - 1;
+    if (runFinishedWhileOthersRun) {
+      setInspectStepByAlgorithm((prev) => ({ ...prev, [algorithm]: clamped }));
+      return;
+    }
+    goToStep(clamped);
+  }
+
   async function askExplanation(algorithm: Algorithm, step: SortingStep, arrayState: number[], stepListIndex: number) {
-    setIsPlaying(false);
-    setCurrentStep(stepListIndex);
-    setInspectNotice('Executia a fost oprita pentru generarea explicatiei.');
+    const runFinishedWhileOthersRun = isPlaying && runs[algorithm].steps.length > 0 && currentStep >= runs[algorithm].steps.length - 1;
+    if (runFinishedWhileOthersRun) {
+      setInspectStepByAlgorithm((prev) => ({ ...prev, [algorithm]: stepListIndex }));
+    } else {
+      setIsPlaying(false);
+      setCurrentStep(stepListIndex);
+      setInspectNotice('Executia a fost oprita pentru generarea explicatiei.');
+    }
     setRuns((prev) => ({ ...prev, [algorithm]: { ...prev[algorithm], isExplaining: true, explainStatus: '' } }));
     const beforeArrayState = step.arrayBeforeStep ?? (stepListIndex > 0
       ? runs[algorithm].steps[stepListIndex - 1]?.arrayState ?? sourceValues
@@ -2400,7 +2420,17 @@ function App() {
                         {(() => {
                           const algorithm = selectedViewAlgorithm;
                           const run = runs[algorithm];
-                          const activeStep = run.steps.length > 0 ? run.steps[Math.min(currentStep, run.steps.length - 1)] : null;
+                          const stepCount = run.steps.length;
+                          const runInspectLimit = stepCount > 0
+                            ? (canInspectExecution ? Math.min(highestReachedStep, stepCount - 1) : stepCount - 1)
+                            : 0;
+                          const runFinishedWhileOthersRun = isPlaying && stepCount > 0 && currentStep >= stepCount - 1;
+                          const canInspectThisRun = canInspectExecution || runFinishedWhileOthersRun;
+                          const fallbackStepIndex = stepCount > 0 ? Math.min(currentStep, stepCount - 1) : 0;
+                          const displayedStepIndex = stepCount > 0
+                            ? Math.min(inspectStepByAlgorithm[algorithm] ?? fallbackStepIndex, runInspectLimit)
+                            : 0;
+                          const activeStep = stepCount > 0 ? run.steps[displayedStepIndex] : null;
                           const activeArrayState = activeStep?.arrayState ?? sourceValues;
                           const stageBuckets = buildStageBuckets(run.steps);
                           return (
@@ -2437,8 +2467,8 @@ function App() {
                                     <NetworkView
                                       length={activeArrayState.length}
                                       stages={stageBuckets}
-                                      currentStepIndex={currentStep}
-                                      onSelectStep={(idx) => goToStep(idx)}
+                                      currentStepIndex={displayedStepIndex}
+                                      onSelectStep={(idx) => goToAlgorithmStep(algorithm, idx, runInspectLimit)}
                                     />
                                   )}
                                 </div>
@@ -2459,20 +2489,20 @@ function App() {
                                     <div className="actions wrap">
                                       <button
                                         className="btn"
-                                        onClick={() => goToStep(Math.max(currentStep - 1, 0))}
-                                        disabled={!canInspectExecution || currentStep <= 0}
+                                        onClick={() => goToAlgorithmStep(algorithm, displayedStepIndex - 1, runInspectLimit)}
+                                        disabled={!canInspectThisRun || displayedStepIndex <= 0}
                                       >
                                         Pas anterior
                                       </button>
-                                      {canInspectExecution && currentStep < inspectLimitStep && (
-                                        <button className="btn" onClick={() => goToStep(currentStep + 1)}>
+                                      {canInspectThisRun && displayedStepIndex < runInspectLimit && (
+                                        <button className="btn" onClick={() => goToAlgorithmStep(algorithm, displayedStepIndex + 1, runInspectLimit)}>
                                           Pas urmator
                                         </button>
                                       )}
                                       <button
                                         className="btn btn-primary"
-                                        onClick={() => askExplanation(algorithm, activeStep, activeArrayState, Math.min(currentStep, run.steps.length - 1))}
-                                        disabled={run.isExplaining || !canInspectExecution}
+                                        onClick={() => askExplanation(algorithm, activeStep, activeArrayState, displayedStepIndex)}
+                                        disabled={run.isExplaining || !canInspectThisRun}
                                       >
                                         {run.isExplaining ? 'Se genereaza...' : 'Explica pas'}
                                       </button>
