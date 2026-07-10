@@ -25,10 +25,16 @@ docker compose -f compose.prod.yaml up -d --build
 
 ## 4. Descarcare model Ollama
 
-Ollama ruleaza ca serviciu Docker separat. Modelul folosit de aplicatie este `llama3.2`.
+Ollama local ramane disponibil ca serviciu Docker separat, dar `explanation-engine` foloseste in productie URL-ul Cloudflare Tunnel configurat in `OLLAMA_BASE_URL`. Modelul folosit de aplicatie este `llama3.2`.
 
 ```bash
 docker exec -it ollama ollama pull llama3.2
+```
+
+Nota: URL-ul `trycloudflare.com` este temporar. Daca tunelul Cloudflare este repornit, URL-ul se poate schimba. Actualizeaza `OLLAMA_BASE_URL` in `compose.prod.yaml`, apoi ruleaza:
+
+```bash
+docker compose -f compose.prod.yaml up -d --force-recreate explanation-engine
 ```
 
 ## 5. Verificare containere
