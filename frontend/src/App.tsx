@@ -746,12 +746,25 @@ function App() {
             <p className="hint-line">Tip: analiza pe un singur algoritm (fara comparatie cu altii).</p>
             <table className="analysis-table">
               <tbody>
-                {getAnalysisFields(entry.algorithmAiAnalysis[entry.selectedAlgorithmForAi] ?? '', 'single').map((item, idx) => (
-                  <tr key={`${entry.id}-analysis-algo-${idx}`}>
-                    <th>{prettyLabel(item.label)}</th>
-                    <td>{item.value}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const rawAnalysis = entry.algorithmAiAnalysis?.[entry.selectedAlgorithmForAi] ?? '';
+                  const fields = getAnalysisFields(rawAnalysis, 'single');
+                  if (fields.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={2}>
+                          <pre className="analysis-pre">{rawAnalysis}</pre>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return fields.map((item, idx) => (
+                    <tr key={`${entry.id}-analysis-algo-${idx}`}>
+                      <th>{prettyLabel(item.label)}</th>
+                      <td>{item.value}</td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
@@ -766,12 +779,24 @@ function App() {
             <p className="hint-line">Tip: analiza comparativa pe mai multi algoritmi, cu castigator.</p>
             <table className="analysis-table">
               <tbody>
-                {getAnalysisFields(entry.aiAnalysis, 'comparative').map((item, idx) => (
-                  <tr key={`${entry.id}-analysis-${idx}`}>
-                    <th>{prettyLabel(item.label)}</th>
-                    <td>{item.value}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const fields = getAnalysisFields(entry.aiAnalysis, 'comparative');
+                  if (fields.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={2}>
+                          <pre className="analysis-pre">{entry.aiAnalysis}</pre>
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return fields.map((item, idx) => (
+                    <tr key={`${entry.id}-analysis-${idx}`}>
+                      <th>{prettyLabel(item.label)}</th>
+                      <td>{item.value}</td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
