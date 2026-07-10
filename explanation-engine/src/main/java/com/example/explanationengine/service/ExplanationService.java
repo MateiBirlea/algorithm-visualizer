@@ -22,6 +22,7 @@ import com.example.explanationengine.dto.SingleAlgorithmAnalysisRequestDto;
 public class ExplanationService {
 
     private static final Logger log = LoggerFactory.getLogger(ExplanationService.class);
+    private static final String CONTROLLED_AI_ERROR = "Nu am putut genera explicatia in acest moment.";
 
     private final OllamaClient ollamaClient;
     private final OllamaProperties properties;
@@ -36,6 +37,9 @@ public class ExplanationService {
         long start = System.currentTimeMillis();
         String reply = ollamaClient.chat(userPrompt);
         long end = System.currentTimeMillis();
+        if (isControlledAiFailure(reply)) {
+            reply = buildDeterministicStepExplanation(request);
+        }
         return new ExplanationResponse(reply, properties.model(), end - start);
     }
 
@@ -184,6 +188,111 @@ public class ExplanationService {
 
     private String join(List<Integer> values) {
         return values.stream().map(Object::toString).collect(Collectors.joining(", "));
+    }
+
+    private boolean isControlledAiFailure(String reply) {
+        return reply == null || reply.isBlank() || CONTROLLED_AI_ERROR.equals(reply.trim());
+    }
+
+    private String buildDeterministicStepExplanation(ExplanationRequest req) {
+        String algorithmName = valueOr(req.getAlgorithmName(), req.getAlgorithm(), "algoritmul selectat");
+        String sortDirection = valueOr(req.getSortDirection(), req.getDirection(), "ASC");
+        String comparatorDirection = valueOr(req.getComparatorDirection(), sortDirection, "ASC");
+        String phaseName = valueOr(req.getPhaseName(), req.getStageName(), "etapa curenta");
+        int leftIndex = req.getLeftIndex() == null ? -1 : req.getLeftIndex();
+        int rightIndex = req.getRightIndex() == null ? -1 : req.getRightIndex();
+        Integer leftValue = req.getLeftValue();
+        Integer rightValue = req.getRightValue();
+        List<Integer> comparedBefore = listOr(req.getComparedValuesBefore(), safePair(leftValue, rightValue));
+        if (comparedBefore.size() >= 2) {
+            leftValue = comparedBefore.get(0);
+            rightValue = comparedBefore.get(1);
+        }
+        List<Integer> afterArray = listOr(req.getArrayAfterStep(), req.getAfterArrayState(), req.getArrayState());
+        List<Integer> comparedAfter = listOr(req.getComparedValuesAfter(), valuesAt(afterArray, req.getLeftIndex(), req.getRightIndex()));
+        boolean didSwap = Boolean.TRUE.equals(req.getDidSwap() == null ? req.getSwapped() : req.getDidSwap());
+        boolean globallySortedAfter = Boolean.TRUE.equals(req.getIsArrayGloballySortedAfterStep());
+        Integer comparatorDistance = req.getComparatorDistance() == null
+                ? (leftIndex >= 0 && rightIndex >= 0 ? Math.abs(rightIndex - leftIndex) : null)
+                : req.getComparatorDistance();
+
+        String relation = comparisonRelation(leftValue, rightValue);
+        String actionReason = buildSwapReason(comparatorDirection, leftValue, rightValue, didSwap);
+        String afterText = comparedAfter.size() >= 2
+                ? " Dupa pas, perechea devine " + comparedAfter.get(0) + " si " + comparedAfter.get(1) + "."
+                : "";
+        String phaseText = buildPhaseText(algorithmName, phaseName, comparatorDistance, req);
+        String sortedText = globallySortedAfter
+                ? " Dupa acest pas, vectorul este sortat conform directiei " + sortDirection + "."
+                : " Vectorul nu este inca descris ca sortat global; acesta este un pas intermediar.";
+
+        return "Comparatorul curent conecteaza pozitiile " + leftIndex + " si " + rightIndex
+                + (comparatorDistance == null ? "" : ", la distanta " + comparatorDistance)
+                + ". Valorile comparate sunt " + valueText(leftValue) + " si " + valueText(rightValue)
+                + ". Directia comparatorului este " + comparatorDirection + ", iar relatia curenta este "
+                + relation + "; " + actionReason + "." + afterText + " " + phaseText + sortedText;
+    }
+
+    private List<Integer> safePair(Integer left, Integer right) {
+        if (left == null || right == null) {
+            return List.of();
+        }
+        return List.of(left, right);
+    }
+
+    private String valueText(Integer value) {
+        return value == null ? "N/A" : value.toString();
+    }
+
+    private String comparisonRelation(Integer left, Integer right) {
+        if (left == null || right == null) {
+            return "necunoscuta";
+        }
+        if (left.equals(right)) {
+            return left + " = " + right;
+        }
+        return left < right ? left + " < " + right : left + " > " + right;
+    }
+
+    private String buildSwapReason(String comparatorDirection, Integer left, Integer right, boolean didSwap) {
+        if (left == null || right == null) {
+            return didSwap ? "s-a facut swap conform comparatorului" : "nu s-a facut swap conform comparatorului";
+        }
+        boolean asc = !"DESC".equalsIgnoreCase(comparatorDirection);
+        if (didSwap) {
+            return asc
+                    ? "se face swap deoarece valoarea din stanga este mai mare decat cea din dreapta"
+                    : "se face swap deoarece valoarea din stanga este mai mica decat cea din dreapta";
+        }
+        return asc
+                ? "nu se face swap deoarece valoarea din stanga este deja mai mica sau egala cu cea din dreapta"
+                : "nu se face swap deoarece valoarea din stanga este deja mai mare sau egala cu cea din dreapta";
+    }
+
+    private String buildPhaseText(String algorithmName, String phaseName, Integer comparatorDistance, ExplanationRequest req) {
+        String upperAlgorithm = algorithmName == null ? "" : algorithmName.toUpperCase();
+        if (upperAlgorithm.contains("BITONIC")) {
+            String mergeSize = req.getMergeSize() == null ? "N/A" : req.getMergeSize().toString();
+            return "Pasul face parte din " + phaseName + " al retelei Bitonic, cu mergeSize " + mergeSize + ".";
+        }
+        if (upperAlgorithm.contains("ODD_EVEN")) {
+            String phase = valueOr(req.getOddEvenPhase(), phaseName);
+            String pass = req.getPassNumber() == null ? "N/A" : req.getPassNumber().toString();
+            return "Pasul apartine fazei " + phase + ", passNumber " + pass + ".";
+        }
+        if (upperAlgorithm.contains("PAIRWISE")) {
+            String stage = req.getNetworkStage() == null ? "N/A" : req.getNetworkStage().toString();
+            String subStage = req.getNetworkSubStage() == null ? "N/A" : req.getNetworkSubStage().toString();
+            String naive = phaseName != null && phaseName.toUpperCase().contains("NAIVE")
+                    ? " Este varianta naive implementata."
+                    : "";
+            return "Pasul apartine etapei pairwise, networkStage " + stage + " si networkSubStage " + subStage + "." + naive;
+        }
+        if (upperAlgorithm.contains("BUBBLE")) {
+            String pass = req.getPassNumber() == null ? "N/A" : req.getPassNumber().toString();
+            return "Pasul este o comparatie locala intre vecini din passNumber " + pass + ".";
+        }
+        return "Pasul face parte din " + phaseName + ".";
     }
 
     @SafeVarargs
@@ -558,12 +667,9 @@ public class ExplanationService {
         );
         String conclusion = extractAnalysisValue(aiReply, "CONCLUZIE_STATISTICA");
         if (conclusion.isBlank()) {
-            conclusion = "Rularea curenta pentru " + algorithmName
-                    + " a executat " + result.getTotalSteps()
-                    + " pasi, " + actualComparisons
-                    + " comparatii si " + result.getTotalSwaps()
-                    + " swap-uri. Verificarea comparatiilor "
-                    + (comparisonMatch ? "coincide cu valoarea teoretica transmisa in DTO." : "difera de valoarea teoretica transmisa in DTO.");
+            conclusion = comparisonMatch
+                    ? algorithmName + " a respectat numarul teoretic de comparatii pentru aceasta rulare, deci executia urmeaza structura asteptata a algoritmului."
+                    : algorithmName + " a executat un numar diferit de comparatii fata de valoarea teoretica, deci merita verificata configuratia rularii sau implementarea pentru acest caz.";
         }
 
         return """
