@@ -144,10 +144,11 @@ services:
     build:
       context: ./frontend
       args:
-        REACT_APP_AUTH_API: http://91.98.194.75:8081
-        REACT_APP_ALGO_API: http://91.98.194.75:8082
-        REACT_APP_EXPLANATION_API: http://91.98.194.75:8083
-        REACT_APP_CLASSROOM_API: http://91.98.194.75:8084
+        REACT_APP_AUTH_API: /auth-api
+        REACT_APP_ALGO_API: /algo-api
+        REACT_APP_EXPLANATION_API: /explanation-api
+        REACT_APP_CLASSROOM_API: /classroom-api
+        REACT_APP_USER_API: /user-api
     container_name: frontend
     ports:
       - "3000:80"
