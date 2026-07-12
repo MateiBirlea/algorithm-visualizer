@@ -206,10 +206,23 @@ type HistoryEntry = {
   isAnalyzingAlgorithm?: Partial<Record<Algorithm, boolean>>;
 };
 
-const API_URL = process.env.REACT_APP_AUTH_API ?? 'http://localhost:8081';
-const ALGO_API = process.env.REACT_APP_ALGO_API ?? 'http://localhost:8082';
-const EXPLANATION_API = process.env.REACT_APP_EXPLANATION_API ?? 'http://localhost:8083';
-const CLASSROOM_API = process.env.REACT_APP_CLASSROOM_API ?? 'http://localhost:8084';
+function apiBase(value: string | undefined, fallback: string) {
+  const base = value?.trim() || fallback;
+  return base.replace(/\/+$/, '');
+}
+
+const API_BASES = {
+  auth: apiBase(process.env.REACT_APP_AUTH_API, '/auth-api'),
+  algo: apiBase(process.env.REACT_APP_ALGO_API, '/algo-api'),
+  explanation: apiBase(process.env.REACT_APP_EXPLANATION_API, '/explanation-api'),
+  classroom: apiBase(process.env.REACT_APP_CLASSROOM_API, '/classroom-api'),
+  user: apiBase(process.env.REACT_APP_USER_API, '/user-api'),
+};
+
+const API_URL = API_BASES.auth;
+const ALGO_API = API_BASES.algo;
+const EXPLANATION_API = API_BASES.explanation;
+const CLASSROOM_API = API_BASES.classroom;
 const MIN_VALUES = 2;
 const MAX_VALUES = 10;
 const MAX_FILE_VALUES = 100;
