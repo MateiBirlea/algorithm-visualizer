@@ -16,11 +16,13 @@ public class WebConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
+                "https://algorithmvisualizer.cc",
+                "https://www.algorithmvisualizer.cc",
                 "http://localhost:3000",
                 "http://91.98.194.75:3000"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
