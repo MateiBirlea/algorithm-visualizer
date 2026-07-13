@@ -226,6 +226,8 @@ const CLASSROOM_API = API_BASES.classroom;
 const MIN_VALUES = 2;
 const MAX_VALUES = 10;
 const MAX_FILE_VALUES = 100;
+const BITONIC_POWER_OF_TWO_MESSAGE =
+  'Bitonic Sort poate fi executat numai pentru un numar de elemente egal cu o putere a lui 2: 2, 4, 8, 16, 32 sau 64.';
 const AVAILABLE_ALGORITHMS: Algorithm[] = [
   'BITONIC',
   'ODD_EVEN',
@@ -278,6 +280,29 @@ function isSorted(values: number[], direction: Direction) {
     }
     return direction === 'ASC' ? values[index - 1] <= value : values[index - 1] >= value;
   });
+}
+
+export function isPowerOfTwo(value: number) {
+  return value > 0 && (value & (value - 1)) === 0;
+}
+
+export function validateRunInput(values: number[], maxAllowed: number, source: 'manual' | 'file', algorithm?: Algorithm) {
+  if (values.length < MIN_VALUES) {
+    return `Trebuie sa introduci cel putin ${MIN_VALUES} valori. Ai ${values.length}.`;
+  }
+  if (values.length > maxAllowed) {
+    return source === 'manual'
+      ? `Ai introdus ${values.length} valori. In modul normal poti rula intre ${MIN_VALUES}-${MAX_VALUES}; pentru mai multe, incarca un fisier.`
+      : `Setul din fisier trebuie sa aiba cel mult ${MAX_FILE_VALUES} valori. Ai ${values.length}.`;
+  }
+  if (algorithm === 'BITONIC' && !isPowerOfTwo(values.length)) {
+    return BITONIC_POWER_OF_TWO_MESSAGE;
+  }
+  return '';
+}
+
+function apiErrorMessage(err: any) {
+  return err?.response?.data?.message ?? err?.response?.data?.error ?? err?.message ?? String(err);
 }
 
 function theoreticalComparisonsFor(algorithm: Algorithm, elementCount: number, fallback: number) {
@@ -396,7 +421,7 @@ function buildHistoryResult(
   };
 }
 
-function buildStageBuckets(steps: SortingStep[]): NetworkStage[] {
+export function buildStageBuckets(steps: SortingStep[]): NetworkStage[] {
   const map = new Map<number, SortingStep[]>();
   steps.forEach((step) => {
     const group = map.get(step.stageIndex) ?? [];
@@ -1285,13 +1310,18 @@ function App() {
     setPendingStudentAssignment(null);
     setStatus('Tema ruleaza prin algo-service...');
     try {
+      const values = parseFlexibleValues(assignment.inputData);
+      const validationMessage = validateRunInput(values, MAX_FILE_VALUES, 'file', assignment.algorithm);
+      if (validationMessage) {
+        setStatus(validationMessage);
+        return;
+      }
       const startRes = await fetch(`${CLASSROOM_API}/api/assignments/${assignment.id}/start`, { method: 'POST', headers: authHeaders() });
       if (!startRes.ok) {
         setStatus('Tema nu poate fi pornita: este deja finalizata sau deadline-ul a trecut.');
         await loadStudentData();
         return;
       }
-      const values = parseFlexibleValues(assignment.inputData);
       const res = await axios.post(`${ALGO_API}/api/sorting-networks/execute`, {
         values,
         algorithm: assignment.algorithm,
@@ -1377,7 +1407,7 @@ function App() {
       setStatus(`Tema finalizata: ${assignment.title}`);
       await loadStudentData();
     } catch (err) {
-      setStatus(`Eroare la finalizarea temei: ${String(err)}`);
+      setStatus(`Eroare la finalizarea temei: ${apiErrorMessage(err)}`);
     }
   }
 
@@ -1604,6 +1634,9 @@ function App() {
           return;
         }
         failed.push(algorithm);
+        if (algorithm === 'BITONIC') {
+          mismatched.push(apiErrorMessage(res.reason));
+        }
       });
       setRuns(next);
       setLastRunMode('parallel');
@@ -1624,11 +1657,11 @@ function App() {
         });
       }
       if (failed.length > 0) {
-        const mismatchText = mismatched.length > 0 ? ` Mapping invalid: ${mismatched.join('; ')}.` : '';
+        const mismatchText = mismatched.length > 0 ? ` ${mismatched.join('; ')}.` : '';
         setStatus(`Nu au rulat: ${failed.join(', ')}.${mismatchText}`);
       }
     } catch (err: any) {
-      setStatus(`Eroare executie: ${err?.message ?? err}`);
+      setStatus(`Eroare executie: ${apiErrorMessage(err)}`);
     } finally {
       setIsRunningAlgo(false);
     }
@@ -1637,14 +1670,15 @@ function App() {
   async function runSingleAlgorithm(source: 'manual' | 'file') {
     const values = source === 'file' ? uploadedValues : parseValues(algoValues);
     const maxAllowed = source === 'file' ? MAX_FILE_VALUES : MAX_VALUES;
-    if (values.length < MIN_VALUES || values.length > maxAllowed) {
-      if (values.length < MIN_VALUES) {
-        setStatus(`Trebuie sa introduci cel putin ${MIN_VALUES} valori. Ai ${values.length}.`);
-      } else if (source === 'manual') {
-        setStatus(`Ai introdus ${values.length} valori. In modul normal poti rula intre ${MIN_VALUES}-${MAX_VALUES}; pentru mai multe, incarca un fisier.`);
-      } else {
-        setStatus(`Setul din fisier trebuie sa aiba cel mult ${MAX_FILE_VALUES} valori. Ai ${values.length}.`);
-      }
+    const validationMessage = validateRunInput(values, maxAllowed, source, selectedAlgorithm);
+    if (validationMessage) {
+      setStatus(validationMessage);
+      setRuns(createInitialRuns());
+      setCurrentStep(0);
+      setHighestReachedStep(0);
+      setIsPlaying(false);
+      setIsStoppedManually(false);
+      setInspectNotice('');
       return;
     }
 
@@ -1692,7 +1726,7 @@ function App() {
         ],
       });
     } catch (err: any) {
-      setStatus(`Eroare executie: ${err?.message ?? err}`);
+      setStatus(`Eroare executie: ${apiErrorMessage(err)}`);
     } finally {
       setIsRunningAlgo(false);
     }

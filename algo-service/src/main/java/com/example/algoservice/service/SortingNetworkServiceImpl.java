@@ -26,6 +26,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SortingNetworkServiceImpl implements SortingNetworkService {
     private static final int MIN_VALUES = 2;
     private static final int MAX_VALUES = 100;
+    private static final String BITONIC_POWER_OF_TWO_MESSAGE =
+            "Bitonic Sort poate fi executat numai pentru un numar de elemente egal cu o putere a lui 2: 2, 4, 8, 16, 32 sau 64.";
 
     private final Map<SortingNetworkAlgorithm, SortingNetworkAlgorithmStrategy> strategies = Map.of(
             SortingNetworkAlgorithm.BITONIC, new BitonicSortingNetworkAlgorithm(),
@@ -42,11 +44,7 @@ public class SortingNetworkServiceImpl implements SortingNetworkService {
         List<Integer> working = new ArrayList<>(request.getValues());
         List<SortingStepDto> steps = new ArrayList<>();
         AtomicInteger stepCounter = new AtomicInteger(0);
-        boolean forceRequestedAlgorithm = Boolean.TRUE.equals(request.getForceRequestedAlgorithm());
-        SortingNetworkAlgorithm effectiveAlgorithm =
-                !forceRequestedAlgorithm && request.getAlgorithm() == SortingNetworkAlgorithm.BITONIC && !isPowerOfTwo(working.size())
-                        ? SortingNetworkAlgorithm.ODD_EVEN
-                        : request.getAlgorithm();
+        SortingNetworkAlgorithm effectiveAlgorithm = request.getAlgorithm();
 
         long start = System.nanoTime();
         SortingNetworkAlgorithmStrategy strategy = strategies.get(effectiveAlgorithm);
@@ -92,6 +90,9 @@ public class SortingNetworkServiceImpl implements SortingNetworkService {
         if (request.getAlgorithm() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Algoritmul este obligatoriu.");
         }
+        if (request.getAlgorithm() == SortingNetworkAlgorithm.BITONIC && !isPowerOfTwo(n)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, BITONIC_POWER_OF_TWO_MESSAGE);
+        }
         if (request.getDirection() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Direcția este obligatorie.");
         }
@@ -135,3 +136,4 @@ public class SortingNetworkServiceImpl implements SortingNetworkService {
         return true;
     }
 }
+
