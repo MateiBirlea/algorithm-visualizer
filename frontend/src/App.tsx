@@ -27,6 +27,16 @@ type AdminAccount = {
   role: ManagedRole;
 };
 
+type UserProfile = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  address: string;
+  role: Role;
+};
+
 type SortingStep = {
   stepIndex: number;
   totalSteps?: number;
@@ -223,6 +233,7 @@ const API_URL = API_BASES.auth;
 const ALGO_API = API_BASES.algo;
 const EXPLANATION_API = API_BASES.explanation;
 const CLASSROOM_API = API_BASES.classroom;
+const USER_API = API_BASES.user;
 const MIN_VALUES = 2;
 const MAX_VALUES = 10;
 const MAX_FILE_VALUES = 100;
@@ -598,6 +609,7 @@ function App() {
   const [regPassword, setRegPassword] = useState('');
   const [regRole, setRegRole] = useState<Role>('STUDENT');
   const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]);
+  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   const [adminFirstName, setAdminFirstName] = useState('');
   const [adminLastName, setAdminLastName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
@@ -1102,11 +1114,29 @@ function App() {
     }
   }, [token]);
 
+  const fetchUserProfiles = useCallback(async () => {
+    setIsAdminLoading(true);
+    try {
+      const res = await fetch(`${USER_API}/api/users`);
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setStatus(`Eroare incarcare profiluri user-service: ${responseErrorMessage(body, res.statusText)}`);
+        return;
+      }
+      setUserProfiles(body as UserProfile[]);
+    } catch (err) {
+      setStatus(`Eroare user-service: ${String(err)}`);
+    } finally {
+      setIsAdminLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (token && role === 'ADMIN') {
       fetchAdminAccounts();
+      fetchUserProfiles();
     }
-  }, [fetchAdminAccounts, role, token]);
+  }, [fetchAdminAccounts, fetchUserProfiles, role, token]);
 
   const authHeaders = useCallback(
     () => ({
@@ -1281,8 +1311,13 @@ function App() {
     if (!selectedClassId) {
       return;
     }
+    const normalizedDueDate = assignmentDueDate
+      ? assignmentDueDate.includes('T')
+        ? assignmentDueDate
+        : `${assignmentDueDate}T23:59:00`
+      : null;
     if (assignmentDueDate) {
-      const selected = new Date(assignmentDueDate);
+      const selected = new Date(normalizedDueDate ?? assignmentDueDate);
       const tomorrow = new Date();
       tomorrow.setHours(0, 0, 0, 0);
       tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1302,7 +1337,7 @@ function App() {
           algorithm: assignmentAlgorithm,
           direction: assignmentDirection,
           inputData: assignmentInputData,
-          dueDate: assignmentDueDate || null,
+          dueDate: normalizedDueDate,
           status: assignmentStatus,
         }),
       });
@@ -1313,6 +1348,7 @@ function App() {
       }
       setAssignmentTitle('');
       setAssignmentDescription('');
+      setAssignmentDueDate('');
       setAssignmentFileName('');
       await loadClassDetails(selectedClassId);
       await loadTeacherData();
@@ -1566,7 +1602,7 @@ function App() {
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
     const offsetMs = tomorrow.getTimezoneOffset() * 60_000;
-    return new Date(tomorrow.getTime() - offsetMs).toISOString().slice(0, 16);
+    return new Date(tomorrow.getTime() - offsetMs).toISOString().slice(0, 10);
   }
 
   async function handleAdminCreateAccount() {
@@ -1966,7 +2002,8 @@ function App() {
           </div>
           <div className="pill-row">
             <span className="pill">Auth API: {API_URL}</span>
-            <button className="btn" onClick={fetchAdminAccounts} disabled={isAdminLoading}>
+            <span className="pill">User API: {USER_API}</span>
+            <button className="btn" onClick={() => { fetchAdminAccounts(); fetchUserProfiles(); }} disabled={isAdminLoading}>
               Reincarca lista
             </button>
           </div>
@@ -2044,6 +2081,41 @@ function App() {
                             Sterge
                           </button>
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="card subtle admin-list-card">
+            <div className="card-header tight">
+              <div>
+                <p className="eyebrow">Profiluri user-service</p>
+                <h4>{userProfiles.length} profiluri auxiliare</h4>
+              </div>
+            </div>
+            {userProfiles.length === 0 ? (
+              <div className="status subtle">Nu exista profiluri in user-service sau serviciul nu a raspuns.</div>
+            ) : (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Nume</th>
+                      <th>Email</th>
+                      <th>Telefon</th>
+                      <th>Rol</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userProfiles.map((profile) => (
+                      <tr key={profile.id}>
+                        <td>{profile.firstName} {profile.lastName}</td>
+                        <td>{profile.email}</td>
+                        <td>{profile.phoneNumber}</td>
+                        <td><span className="pill subtle">{profile.role}</span></td>
                       </tr>
                     ))}
                   </tbody>
@@ -2130,7 +2202,7 @@ function App() {
                     <p className="eyebrow">Teme</p>
                     <div className="grid two-col">
                       <div className="field"><label>Titlu</label><input value={assignmentTitle} onChange={(e) => setAssignmentTitle(e.target.value)} /></div>
-                      <div className="field"><label>Deadline</label><input type="datetime-local" min={minAssignmentDueDate()} value={assignmentDueDate} onChange={(e) => setAssignmentDueDate(e.target.value)} /></div>
+                      <div className="field"><label>Deadline</label><input type="date" min={minAssignmentDueDate()} value={assignmentDueDate} onChange={(e) => setAssignmentDueDate(e.target.value)} /></div>
                     </div>
                     <div className="field"><label>Descriere</label><input value={assignmentDescription} onChange={(e) => setAssignmentDescription(e.target.value)} /></div>
                     <div className="grid two-col">
