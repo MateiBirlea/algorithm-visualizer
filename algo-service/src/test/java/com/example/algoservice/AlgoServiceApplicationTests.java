@@ -174,6 +174,33 @@ class AlgoServiceApplicationTests {
                 .isGreaterThan(oddEven.getMetrics().getTotalComparisons());
     }
 
+    @ParameterizedTest
+    @MethodSource("pairwiseSingleBlockCases")
+    void pairwiseSingleBlockVariantSortsRequiredCases(List<Integer> values, SortDirection direction) {
+        SortingNetworkExecuteResponseDto response = new SortingNetworkServiceImpl()
+                .execute(requestFor(values, SortingNetworkAlgorithm.PAIRWISE_SORTING_NETWORK, direction));
+
+        assertThat(response.getCorrectlySorted()).isTrue();
+        assertThat(response.getFinalArray()).isEqualTo(sorted(values, direction));
+        assertThat(response.getSteps())
+                .allSatisfy(step -> assertThat(step.getPhaseName()).startsWith("PAIRWISE_NAIVE"));
+    }
+
+    @Test
+    void pairwiseSingleBlockVariantHasExpectedComparisonCounts() {
+        SortingNetworkServiceImpl service = new SortingNetworkServiceImpl();
+
+        SortingNetworkExecuteResponseDto eight = service.execute(
+                requestFor(values(8), SortingNetworkAlgorithm.PAIRWISE_SORTING_NETWORK, SortDirection.ASC)
+        );
+        SortingNetworkExecuteResponseDto sixteen = service.execute(
+                requestFor(values(16), SortingNetworkAlgorithm.PAIRWISE_SORTING_NETWORK, SortDirection.ASC)
+        );
+
+        assertThat(eight.getTotalComparisons()).isEqualTo(49);
+        assertThat(sixteen.getTotalComparisons()).isEqualTo(177);
+    }
+
     private SortingNetworkExecuteRequestDto requestFor(SortingNetworkAlgorithm algorithm, boolean forceRequestedAlgorithm) {
         SortingNetworkExecuteRequestDto request = new SortingNetworkExecuteRequestDto();
         request.setValues(IntStream.rangeClosed(1, 64).boxed().toList());
@@ -220,6 +247,27 @@ class AlgoServiceApplicationTests {
 
     private static Stream<Integer> invalidBatcherSizes() {
         return Stream.of(5, 7);
+    }
+
+    private static Stream<org.junit.jupiter.params.provider.Arguments> pairwiseSingleBlockCases() {
+        List<List<Integer>> cases = List.of(
+                List.of(1, 2, 3, 4, 5, 6, 7, 8),
+                List.of(8, 7, 6, 5, 4, 3, 2, 1),
+                List.of(5, 2, 5, 1, 5, 3, 5, 4),
+                List.of(-3, 7, -1, 0, -5, 2, 4, -2),
+                values(2),
+                values(3),
+                values(4),
+                values(5),
+                values(7),
+                values(8),
+                values(13),
+                values(16)
+        );
+        return cases.stream().flatMap(values -> Stream.of(
+                org.junit.jupiter.params.provider.Arguments.of(values, SortDirection.ASC),
+                org.junit.jupiter.params.provider.Arguments.of(values, SortDirection.DESC)
+        ));
     }
 
     private static List<Integer> values(int size) {

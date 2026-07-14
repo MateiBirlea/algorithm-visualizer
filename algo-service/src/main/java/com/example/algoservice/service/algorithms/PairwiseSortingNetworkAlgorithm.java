@@ -18,14 +18,10 @@ public class PairwiseSortingNetworkAlgorithm extends AbstractSortingNetworkAlgor
                     "PAIRWISE_NAIVE_COMPARE", 2, null, "Pairwise naive compare", steps, stepCounter);
         }
 
-        for (int blockSize = 4; blockSize < n * 2; blockSize *= 2) {
-            stage++;
-            for (int start = 0; start < n; start += blockSize) {
-                int end = Math.min(start + blockSize, n);
-                runGappedMerge(values, start, end, blockSize / 2, direction, stage, blockSize, steps, stepCounter);
-                runAdjacentCleanup(values, start, end, direction, stage, blockSize, steps, stepCounter);
-            }
-        }
+        int blockSize = nextPowerOfTwo(n);
+        stage++;
+        runGappedMerge(values, 0, n, blockSize / 2, direction, stage, blockSize, steps, stepCounter);
+        runAdjacentCleanup(values, 0, n, direction, stage, blockSize, steps, stepCounter);
     }
 
     private void runGappedMerge(List<Integer> values, int start, int end, int initialGap, SortDirection direction,
@@ -46,5 +42,13 @@ public class PairwiseSortingNetworkAlgorithm extends AbstractSortingNetworkAlgor
                         "PAIRWISE_NAIVE_CLEANUP", mergeSize, null, "Pairwise naive insertion cleanup", steps, stepCounter);
             }
         }
+    }
+
+    private int nextPowerOfTwo(int n) {
+        int p = 1;
+        while (p < n) {
+            p <<= 1;
+        }
+        return p;
     }
 }
