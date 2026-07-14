@@ -228,6 +228,8 @@ const MAX_VALUES = 10;
 const MAX_FILE_VALUES = 100;
 const BITONIC_POWER_OF_TWO_MESSAGE =
   'Bitonic Sort poate fi executat numai pentru un numar de elemente egal cu o putere a lui 2: 2, 4, 8, 16, 32 sau 64.';
+const BATCHER_POWER_OF_TWO_MESSAGE =
+  'Batcher Odd-Even Merge Sort poate fi executat doar pentru un numar de elemente egal cu o putere a lui 2 (2, 4, 8, 16, 32...).';
 const AVAILABLE_ALGORITHMS: Algorithm[] = [
   'BITONIC',
   'ODD_EVEN',
@@ -297,6 +299,9 @@ export function validateRunInput(values: number[], maxAllowed: number, source: '
   }
   if (algorithm === 'BITONIC' && !isPowerOfTwo(values.length)) {
     return BITONIC_POWER_OF_TWO_MESSAGE;
+  }
+  if (algorithm === 'BATCHER_ODD_EVEN_MERGE_SORT' && !isPowerOfTwo(values.length)) {
+    return BATCHER_POWER_OF_TWO_MESSAGE;
   }
   return '';
 }

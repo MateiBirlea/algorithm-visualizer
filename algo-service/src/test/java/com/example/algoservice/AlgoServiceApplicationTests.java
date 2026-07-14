@@ -80,11 +80,34 @@ class AlgoServiceApplicationTests {
     }
 
     @ParameterizedTest
+    @MethodSource("validBatcherSizes")
+    void batcherRunsOnlyForPowerOfTwoSizes(int size) {
+        SortingNetworkExecuteRequestDto request = requestFor(values(size), SortingNetworkAlgorithm.BATCHER_ODD_EVEN_MERGE_SORT, SortDirection.ASC);
+
+        SortingNetworkExecuteResponseDto response = new SortingNetworkServiceImpl().execute(request);
+
+        assertThat(response.getEffectiveAlgorithm()).isEqualTo(SortingNetworkAlgorithm.BATCHER_ODD_EVEN_MERGE_SORT);
+        assertThat(response.getCorrectlySorted()).isTrue();
+        assertThat(response.getFinalArray()).isEqualTo(sorted(values(size), SortDirection.ASC));
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidBatcherSizes")
+    void batcherRejectsNonPowerOfTwoSizes(int size) {
+        SortingNetworkExecuteRequestDto request = requestFor(values(size), SortingNetworkAlgorithm.BATCHER_ODD_EVEN_MERGE_SORT, SortDirection.ASC);
+
+        assertThatThrownBy(() -> new SortingNetworkServiceImpl().execute(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Batcher Odd-Even Merge Sort poate fi executat doar");
+    }
+
+    @ParameterizedTest
     @MethodSource("sortingCases")
     void allAlgorithmsSortCorrectlyForRequiredCases(List<Integer> values, SortDirection direction) {
         SortingNetworkServiceImpl service = new SortingNetworkServiceImpl();
         for (SortingNetworkAlgorithm algorithm : SortingNetworkAlgorithm.values()) {
-            if (algorithm == SortingNetworkAlgorithm.BITONIC && !isPowerOfTwo(values.size())) {
+            if ((algorithm == SortingNetworkAlgorithm.BITONIC || algorithm == SortingNetworkAlgorithm.BATCHER_ODD_EVEN_MERGE_SORT)
+                    && !isPowerOfTwo(values.size())) {
                 continue;
             }
             SortingNetworkExecuteRequestDto request = new SortingNetworkExecuteRequestDto();
@@ -114,7 +137,8 @@ class AlgoServiceApplicationTests {
                 .toList();
 
         List<String> signatures = Stream.of(SortingNetworkAlgorithm.values())
-                .filter(algorithm -> algorithm != SortingNetworkAlgorithm.BITONIC || isPowerOfTwo(values.size()))
+                .filter(algorithm -> (algorithm != SortingNetworkAlgorithm.BITONIC && algorithm != SortingNetworkAlgorithm.BATCHER_ODD_EVEN_MERGE_SORT)
+                        || isPowerOfTwo(values.size()))
                 .map(algorithm -> {
                     SortingNetworkExecuteRequestDto request = new SortingNetworkExecuteRequestDto();
                     request.setValues(new ArrayList<>(values));
@@ -188,6 +212,14 @@ class AlgoServiceApplicationTests {
 
     private static Stream<Integer> invalidBitonicSizes() {
         return Stream.of(3, 5, 6, 7, 9, 10, 15, 17);
+    }
+
+    private static Stream<Integer> validBatcherSizes() {
+        return Stream.of(8, 16);
+    }
+
+    private static Stream<Integer> invalidBatcherSizes() {
+        return Stream.of(5, 7);
     }
 
     private static List<Integer> values(int size) {

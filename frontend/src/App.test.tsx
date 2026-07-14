@@ -14,6 +14,12 @@ test('allows BITONIC execution for a valid power-of-two size', () => {
   expect(isPowerOfTwo(6)).toBe(false);
 });
 
+test('blocks BATCHER execution for invalid sizes before animation can start', () => {
+  const message = validateRunInput([7, 5, 3, 1, 2, 4, 6], 10, 'manual', 'BATCHER_ODD_EVEN_MERGE_SORT');
+
+  expect(message).toContain('Batcher Odd-Even Merge Sort poate fi executat doar');
+});
+
 test('keeps non-adjacent BITONIC comparators in the displayed network data', () => {
   const stages = buildStageBuckets([
     {

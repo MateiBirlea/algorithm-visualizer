@@ -12,17 +12,7 @@ public class BatcherOddEvenMergeSortAlgorithm extends AbstractSortingNetworkAlgo
     @Override
     public void execute(List<Integer> values, SortDirection direction, List<SortingStepDto> steps, AtomicInteger stepCounter) {
         int originalSize = values.size();
-        int paddedSize = nextPowerOfTwo(originalSize);
-        int sentinel = direction == SortDirection.ASC ? Integer.MAX_VALUE : Integer.MIN_VALUE;
-        while (values.size() < paddedSize) {
-            values.add(sentinel);
-        }
-
         oddEvenMergeSort(values, 0, values.size(), direction, 0, originalSize, steps, stepCounter);
-
-        while (values.size() > originalSize) {
-            values.remove(values.size() - 1);
-        }
     }
 
     private void oddEvenMergeSort(List<Integer> values, int low, int count, SortDirection direction, int stage,
@@ -56,11 +46,6 @@ public class BatcherOddEvenMergeSortAlgorithm extends AbstractSortingNetworkAlgo
     private void compareAndMaybeRecord(List<Integer> values, int i, int j, SortDirection direction, int stage, int distance,
                                        String phaseName, int mergeSize, int originalSize, String explanationPrefix,
                                        List<SortingStepDto> steps, AtomicInteger stepCounter) {
-        if (i >= originalSize || j >= originalSize) {
-            compareOnly(values, i, j, direction);
-            return;
-        }
-
         List<Integer> before = new ArrayList<>(values.subList(0, originalSize));
         compareAndRecord(values, i, j, direction, stage, distance, phaseName, mergeSize, null,
                 explanationPrefix, steps, stepCounter);
@@ -70,21 +55,4 @@ public class BatcherOddEvenMergeSortAlgorithm extends AbstractSortingNetworkAlgo
         step.setArrayState(new ArrayList<>(values.subList(0, originalSize)));
     }
 
-    private void compareOnly(List<Integer> values, int i, int j, SortDirection direction) {
-        int left = values.get(i);
-        int right = values.get(j);
-        boolean shouldSwap = direction == SortDirection.ASC ? left > right : left < right;
-        if (shouldSwap) {
-            values.set(i, right);
-            values.set(j, left);
-        }
-    }
-
-    private int nextPowerOfTwo(int n) {
-        int p = 1;
-        while (p < n) {
-            p <<= 1;
-        }
-        return p;
-    }
 }

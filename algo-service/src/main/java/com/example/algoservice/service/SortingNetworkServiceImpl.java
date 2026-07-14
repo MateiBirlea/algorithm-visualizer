@@ -28,6 +28,8 @@ public class SortingNetworkServiceImpl implements SortingNetworkService {
     private static final int MAX_VALUES = 100;
     private static final String BITONIC_POWER_OF_TWO_MESSAGE =
             "Bitonic Sort poate fi executat numai pentru un numar de elemente egal cu o putere a lui 2: 2, 4, 8, 16, 32 sau 64.";
+    private static final String BATCHER_POWER_OF_TWO_MESSAGE =
+            "Batcher Odd-Even Merge Sort poate fi executat doar pentru un numar de elemente egal cu o putere a lui 2 (2, 4, 8, 16, 32...).";
 
     private final Map<SortingNetworkAlgorithm, SortingNetworkAlgorithmStrategy> strategies = Map.of(
             SortingNetworkAlgorithm.BITONIC, new BitonicSortingNetworkAlgorithm(),
@@ -92,6 +94,9 @@ public class SortingNetworkServiceImpl implements SortingNetworkService {
         }
         if (request.getAlgorithm() == SortingNetworkAlgorithm.BITONIC && !isPowerOfTwo(n)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, BITONIC_POWER_OF_TWO_MESSAGE);
+        }
+        if (request.getAlgorithm() == SortingNetworkAlgorithm.BATCHER_ODD_EVEN_MERGE_SORT && !isPowerOfTwo(n)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, BATCHER_POWER_OF_TWO_MESSAGE);
         }
         if (request.getDirection() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Direcția este obligatorie.");
