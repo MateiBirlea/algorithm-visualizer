@@ -337,6 +337,32 @@ function defaultPhaseFor(algorithm: Algorithm, stageIndex: number) {
   return 'BITONIC_MERGE';
 }
 
+function stepExplanationRulesFor(algorithm: Algorithm) {
+  const rules = [
+    `Explica strict algoritmul ${algorithm}.`,
+    'Explica doar comparatorul curent.',
+    'Nu mentiona si nu compara cu alti algoritmi.',
+    'Nu da exemple din alti algoritmi.',
+    'Nu spune ca vectorul este sortat global decat daca isArrayGloballySortedAfterStep=true.',
+    'Daca didSwap=true, explica exact de ce s-a facut swap conform directiei comparatorului.',
+    'Daca didSwap=false, explica exact de ce nu s-a facut swap.',
+    'Nu inventa justificari despre alte portiuni ale vectorului daca nu sunt in DTO.',
+    'Foloseste doar valorile din DTO.',
+  ];
+  if (algorithm === 'BITONIC') {
+    rules.push('Pentru Bitonic, explica faptul ca pozitiile sunt comparate deoarece fac parte din reteaua Bitonic si mentioneaza comparatorDistance, mergeSize si phaseName.');
+  } else if (algorithm === 'ODD_EVEN') {
+    rules.push('Pentru Odd-Even, mentioneaza doar faza curenta EVEN sau ODD si passNumber.');
+  } else if (algorithm === 'BATCHER_ODD_EVEN_MERGE_SORT') {
+    rules.push('Pentru Batcher Odd-Even Merge Sort, mentioneaza doar reteaua odd-even merge si mergeSize.');
+  } else if (algorithm === 'PAIRWISE_SORTING_NETWORK') {
+    rules.push('Pentru Pairwise Sorting Network, mentioneaza etapa pairwise si networkStage/networkSubStage; daca phaseName contine NAIVE, mentioneaza ca este varianta naive implementata.');
+  } else if (algorithm === 'BUBBLE_SORTING_NETWORK') {
+    rules.push('Pentru Bubble Sorting Network, mentioneaza passNumber si comparatia locala dintre vecini.');
+  }
+  return rules;
+}
+
 function withFinalAnalysisFields(result: HistoryResult, entry: HistoryEntry, allResults: HistoryResult[]) {
   const initialArray = result.initialArray ?? entry.inputValues;
   const finalArray = result.finalArray ?? [];
@@ -1863,20 +1889,7 @@ function App() {
         explanationWarning: isArrayGloballySortedAfterStep
           ? ''
           : 'Vectorul poate fi intr-o stare intermediara si nu trebuie descris ca sortat global decat daca isArrayGloballySortedAfterStep=true.',
-        explanationRules: [
-          'Explica doar comparatorul curent.',
-          'Nu spune ca vectorul este sortat global decat daca isArrayGloballySortedAfterStep=true.',
-          'Pentru Bitonic, explica faptul ca pozitiile sunt comparate deoarece fac parte din reteaua Bitonic, nu pentru ca indexul mai mic trebuie mereu sa aiba valoarea mai mica.',
-          'Pentru Bitonic, mentioneaza comparatorDistance, mergeSize si phaseName.',
-          'Pentru Odd-Even, mentioneaza daca este faza EVEN sau ODD.',
-          'Pentru Batcher Odd-Even Merge Sort, mentioneaza ca pasul face parte din reteaua odd-even merge.',
-          'Pentru Pairwise Sorting Network, mentioneaza etapa pairwise si networkStage/networkSubStage.',
-          'Pentru Bubble Sorting Network, mentioneaza passNumber si comparatia locala dintre vecini.',
-          'Daca didSwap=true, explica exact de ce s-a facut swap conform directiei comparatorului.',
-          'Daca didSwap=false, explica exact de ce nu s-a facut swap.',
-          'Nu inventa justificari despre alte portiuni ale vectorului daca nu sunt in DTO.',
-          'Foloseste doar valorile din DTO.',
-        ],
+        explanationRules: stepExplanationRulesFor(explanationAlgorithm),
       });
       const explanation = res.data?.explanation ?? 'Modelul nu a returnat un text.';
       setRuns((prev) => ({

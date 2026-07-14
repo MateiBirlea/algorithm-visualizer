@@ -104,9 +104,8 @@ public class ExplanationService {
                 : req.getComparatorDistance();
         Integer mergeSize = req.getMergeSize() == null ? req.getBitonicSequenceSize() : req.getMergeSize();
         String oddEvenPhase = valueOr(req.getOddEvenPhase(), phaseName.contains("ODD") ? "ODD" : phaseName.contains("EVEN") ? "EVEN" : "");
-        String explanationRules = req.getExplanationRules() == null || req.getExplanationRules().isEmpty()
-                ? defaultExplanationRules()
-                : req.getExplanationRules().stream().map(rule -> "- " + rule).collect(Collectors.joining("\n"));
+        String explanationRules = strictStepExplanationRules(algorithmName);
+        String algorithmGuidance = algorithmSpecificStepGuidance(algorithmName);
         String warning = valueOr(
                 req.getExplanationWarning(),
                 "Vectorul poate fi intr-o stare intermediara si nu trebuie descris ca sortat global decat daca isArrayGloballySortedAfterStep=true."
@@ -149,11 +148,7 @@ public class ExplanationService {
                 Format dorit:
                 - Raspunde in romana, in 2-4 propozitii scurte.
                 - Incepe cu "Comparatorul curent conecteaza pozitiile ...".
-                - Pentru BITONIC, spune ca pozitiile sunt conectate de reteaua Bitonic in phaseName si mentioneaza comparatorDistance si mergeSize.
-                - Pentru ODD_EVEN, mentioneaza faza oddEvenPhase si passNumber.
-                - Pentru BATCHER_ODD_EVEN_MERGE_SORT, mentioneaza reteaua odd-even merge si mergeSize.
-                - Pentru PAIRWISE_SORTING_NETWORK, mentioneaza etapa pairwise, networkStage si networkSubStage; daca phaseName contine NAIVE, spune explicit ca pasul apartine variantei naive implementate.
-                - Pentru BUBBLE_SORTING_NETWORK, mentioneaza passNumber si faptul ca este o comparatie locala intre vecini.
+                - %s
                 - Incheie cu avertizarea despre sortarea globala daca isArrayGloballySortedAfterStep=false.
 
                 """.formatted(
@@ -182,7 +177,8 @@ public class ExplanationService {
                 globallySortedBefore,
                 globallySorted,
                 warning,
-                explanationRules
+                explanationRules,
+                algorithmGuidance
         );
     }
 
@@ -322,21 +318,38 @@ public class ExplanationService {
         return List.of(values.get(leftIndex), values.get(rightIndex));
     }
 
-    private String defaultExplanationRules() {
+    private String strictStepExplanationRules(String algorithmName) {
+        String selectedAlgorithm = valueOr(algorithmName, "algoritmul selectat");
         return """
                 - Explica doar comparatorul curent.
+                - Explica strict algoritmul %s. Nu mentiona si nu compara cu alti algoritmi.
+                - Nu da exemple din alti algoritmi si nu folosi explicatii generale care apartin altui algoritm.
                 - Nu spune ca vectorul este sortat global decat daca isArrayGloballySortedAfterStep=true.
-                - Pentru Bitonic, explica faptul ca pozitiile sunt comparate deoarece fac parte din reteaua Bitonic, nu pentru ca indexul mai mic trebuie mereu sa aiba valoarea mai mica.
-                - Pentru Bitonic, mentioneaza comparatorDistance, mergeSize si phaseName.
-                - Pentru Odd-Even, mentioneaza daca este faza EVEN sau ODD.
-                - Pentru Batcher Odd-Even Merge Sort, mentioneaza reteaua odd-even merge.
-                - Pentru Pairwise Sorting Network, mentioneaza etapa pairwise si networkStage/networkSubStage; daca phaseName contine NAIVE, mentioneaza ca este varianta naive implementata.
-                - Pentru Bubble Sorting Network, mentioneaza passNumber si comparatia locala dintre vecini.
                 - Daca didSwap=true, explica exact de ce s-a facut swap conform directiei comparatorului.
                 - Daca didSwap=false, explica exact de ce nu s-a facut swap.
                 - Nu inventa justificari despre alte portiuni ale vectorului daca nu sunt in DTO.
                 - Foloseste doar valorile din DTO.
-                """;
+                """.formatted(selectedAlgorithm);
+    }
+
+    private String algorithmSpecificStepGuidance(String algorithmName) {
+        String upperAlgorithm = algorithmName == null ? "" : algorithmName.toUpperCase();
+        if (upperAlgorithm.contains("BITONIC")) {
+            return "Pentru BITONIC, spune ca pozitiile sunt conectate de reteaua Bitonic in phaseName si mentioneaza comparatorDistance si mergeSize; nu mentiona Odd-Even, Batcher, Pairwise sau Bubble.";
+        }
+        if (upperAlgorithm.contains("BATCHER")) {
+            return "Pentru BATCHER_ODD_EVEN_MERGE_SORT, mentioneaza reteaua odd-even merge si mergeSize; nu mentiona Bitonic, Odd-Even simplu, Pairwise sau Bubble.";
+        }
+        if (upperAlgorithm.equals("ODD_EVEN") || upperAlgorithm.contains("ODD_EVEN")) {
+            return "Pentru ODD_EVEN, mentioneaza faza oddEvenPhase si passNumber; nu mentiona Bitonic, Batcher, Pairwise sau Bubble.";
+        }
+        if (upperAlgorithm.contains("PAIRWISE")) {
+            return "Pentru PAIRWISE_SORTING_NETWORK, mentioneaza etapa pairwise, networkStage si networkSubStage; daca phaseName contine NAIVE, spune explicit ca pasul apartine variantei naive implementate; nu mentiona Bitonic, Odd-Even, Batcher sau Bubble.";
+        }
+        if (upperAlgorithm.contains("BUBBLE")) {
+            return "Pentru BUBBLE_SORTING_NETWORK, mentioneaza passNumber si faptul ca este o comparatie locala intre vecini; nu mentiona Bitonic, Odd-Even, Batcher sau Pairwise.";
+        }
+        return "Explica strict algoritmul primit in algorithmName si nu mentiona alti algoritmi.";
     }
 
     private String buildSingleAlgorithmAnalysisPrompt(SingleAlgorithmAnalysisRequestDto req) {

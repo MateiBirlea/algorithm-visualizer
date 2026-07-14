@@ -32,15 +32,19 @@ public class DefaultUsersInitializer implements CommandLineRunner {
                 new SeedUser("Carol", "Coder", "carol.prof@example.com", "Professor123", Role.PROFESOR)
         );
 
-        seeds.forEach(this::createIfMissing);
+        seeds.forEach(this::createOrUpdateSeedUser);
     }
 
-    private void createIfMissing(SeedUser seed) {
-        if (authUserRepository.existsByEmail(seed.email)) {
+    private void createOrUpdateSeedUser(SeedUser seed) {
+        AuthUser user = authUserRepository.findByEmail(seed.email).orElseGet(AuthUser::new);
+        if (user.getId() != null
+                && seed.firstName.equals(user.getFirstName())
+                && seed.lastName.equals(user.getLastName())
+                && seed.role == user.getRole()
+                && passwordEncoder.matches(seed.rawPassword, user.getPassword())) {
             return;
         }
 
-        AuthUser user = new AuthUser();
         user.setFirstName(seed.firstName);
         user.setLastName(seed.lastName);
         user.setEmail(seed.email);
