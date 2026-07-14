@@ -37,13 +37,17 @@ public class OllamaClient {
     }
 
     public String chat(String userPrompt) {
-        return chatInternal(userPrompt, false);
+        return chatInternal(userPrompt, false, 180);
+    }
+
+    public String chat(String userPrompt, int numPredict) {
+        return chatInternal(userPrompt, false, numPredict);
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void warmUpModel() {
         try {
-            String response = chatInternal("Reply only with OK", true);
+            String response = chatInternal("Reply only with OK", true, 20);
             if (CONTROLLED_ERROR_MESSAGE.equals(response)) {
                 log.warn("Ollama warm-up did not complete successfully.");
             }
@@ -52,8 +56,8 @@ public class OllamaClient {
         }
     }
 
-    private String chatInternal(String userPrompt, boolean warmUp) {
-        ChatRequest request = ChatRequest.fromPrompt(properties.model(), userPrompt);
+    private String chatInternal(String userPrompt, boolean warmUp, int numPredict) {
+        ChatRequest request = ChatRequest.fromPrompt(properties.model(), userPrompt, numPredict);
         long start = System.currentTimeMillis();
         log.info("Starting Ollama {}request. model={}", warmUp ? "warm-up " : "", properties.model());
         try {
@@ -85,12 +89,12 @@ public class OllamaClient {
             @JsonProperty("keep_alive") String keepAlive,
             Options options
     ) {
-        static ChatRequest fromPrompt(String model, String user) {
+        static ChatRequest fromPrompt(String model, String user, int numPredict) {
             return new ChatRequest(model,
                     List.of(new Message("user", user)),
                     false,
                     "30m",
-                    new Options(0.3, 180, 2048));
+                    new Options(0.3, numPredict, 2048));
         }
     }
 

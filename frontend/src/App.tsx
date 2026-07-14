@@ -612,6 +612,7 @@ function App() {
   const [classProgress, setClassProgress] = useState<ProgressInfo[]>([]);
   const [classStats, setClassStats] = useState<ClassStats | null>(null);
   const [classAiAnalysis, setClassAiAnalysis] = useState<ClassAiAnalysis | null>(null);
+  const [isClassAiLoading, setIsClassAiLoading] = useState(false);
   const [className, setClassName] = useState('');
   const [classDescription, setClassDescription] = useState('');
   const [assignmentTitle, setAssignmentTitle] = useState('');
@@ -2196,9 +2197,24 @@ function App() {
                     )}
                     <div className="actions">
                       <button className="btn" onClick={async () => {
-                        const res = await fetch(`${CLASSROOM_API}/api/classes/${selectedClass.id}/ai-analysis`, { headers: authHeaders() });
-                        if (res.ok) setClassAiAnalysis((await res.json()) as ClassAiAnalysis);
-                      }}>Genereaza analiza AI</button>
+                        setIsClassAiLoading(true);
+                        setClassAiAnalysis(null);
+                        try {
+                          const res = await fetch(`${CLASSROOM_API}/api/classes/${selectedClass.id}/ai-analysis`, { headers: authHeaders() });
+                          const body = await res.json().catch(() => null);
+                          if (!res.ok) {
+                            setStatus(`Eroare analiza AI clasa: ${responseErrorMessage(body, res.statusText)}`);
+                            return;
+                          }
+                          setClassAiAnalysis(body as ClassAiAnalysis);
+                        } catch (err) {
+                          setStatus(`Eroare analiza AI clasa: ${String(err)}`);
+                        } finally {
+                          setIsClassAiLoading(false);
+                        }
+                      }} disabled={isClassAiLoading}>
+                        {isClassAiLoading ? 'Se genereaza...' : 'Genereaza analiza AI'}
+                      </button>
                       <button className="btn" onClick={() => exportClassReport(selectedClass.id)}>Exporta raport PDF</button>
                     </div>
                     {classAiAnalysis && (

@@ -80,7 +80,7 @@ public class ExplanationService {
     public ExplanationResponse analyzeClassroom(ClassroomAnalysisRequest request) {
         String userPrompt = buildClassroomAnalysisPrompt(request);
         long start = System.currentTimeMillis();
-        String reply = ollamaClient.chat(userPrompt);
+        String reply = ollamaClient.chat(userPrompt, 420);
         long end = System.currentTimeMillis();
         return new ExplanationResponse(reply, properties.model(), end - start);
     }
@@ -940,6 +940,8 @@ public class ExplanationService {
                 - Raspunde in romana.
                 - Nu folosi markdown bold si nu folosi chei tehnice cu underscore.
                 - Structureaza raspunsul exact in sectiunile de mai jos.
+                - Scrie scurt si la obiect: maximum o propozitie pentru fiecare sectiune.
+                - Finalizeaza toate cele 6 sectiuni, fara text taiat sau fraze neterminate.
                 - Daca exista un singur elev, spune explicit acest lucru.
                 - Daca exista teme neincepute, identifica temele dupa titlu.
                 - Daca exista elevi fara activitate, identifica elevii dupa studentId.
@@ -949,22 +951,22 @@ public class ExplanationService {
 
                 Format obligatoriu:
                 Situatia clasei
-                <analiza bazata pe numarElevi, numarTeme si statusuri>
+                <o propozitie bazata pe numarElevi, numarTeme si statusuri>
 
                 Performanta generala
-                <analiza bazata pe rataFinalizare, scorMediu si numarTotalRulari>
+                <o propozitie bazata pe rataFinalizare, scorMediu si numarTotalRulari>
 
                 Observatii importante
-                <observatii despre teme, algoritmi, activitate si statusuri>
+                <o propozitie despre teme, algoritmi, activitate si statusuri>
 
                 Elevii care necesita atentie
-                <studentId si motivul sustinut de studentStats>
+                <o propozitie cu studentId si motivul sustinut de studentStats>
 
                 Recomandari pentru profesor
-                <actiuni concrete legate de datele clasei>
+                <o propozitie cu actiuni concrete legate de datele clasei>
 
                 Concluzie
-                <concluzie scurta bazata pe DTO>
+                <o propozitie scurta bazata pe DTO>
                 """.formatted(
                 req.getClassId(),
                 req.getClassName(),
