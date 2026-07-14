@@ -607,10 +607,13 @@ function App() {
 
   const hasUploadedValues = uploadedValues.length > 0;
   const sourceValues = hasUploadedValues ? uploadedValues : parseValues(algoValues);
-  const visibleAlgorithms = useMemo(
-    () => (lastRunMode === 'parallel' ? AVAILABLE_ALGORITHMS : [activeSingleAlgorithm]),
-    [lastRunMode, activeSingleAlgorithm]
-  );
+  const visibleAlgorithms = useMemo(() => {
+    if (lastRunMode !== 'parallel') {
+      return [activeSingleAlgorithm];
+    }
+    const algorithmsWithSteps = AVAILABLE_ALGORITHMS.filter((algorithm) => runs[algorithm].steps.length > 0);
+    return algorithmsWithSteps.length > 0 ? algorithmsWithSteps : AVAILABLE_ALGORITHMS;
+  }, [lastRunMode, activeSingleAlgorithm, runs]);
   const maxSteps = useMemo(() => Math.max(0, ...visibleAlgorithms.map((a) => runs[a].steps.length)), [runs, visibleAlgorithms]);
   const isInspectMode = inspectNotice.length > 0;
   const singleHistory = useMemo(() => history.filter((h) => h.mode === 'single'), [history]);
@@ -1582,15 +1585,47 @@ function App() {
   async function runAllAlgorithms(source: 'manual' | 'file') {
     const values = source === 'file' ? uploadedValues : parseValues(algoValues);
     const maxAllowed = source === 'file' ? MAX_FILE_VALUES : MAX_VALUES;
-    if (values.length < MIN_VALUES || values.length > maxAllowed) {
-      if (values.length < MIN_VALUES) {
-        setStatus(`Trebuie sa introduci cel putin ${MIN_VALUES} valori. Ai ${values.length}.`);
-      } else if (source === 'manual') {
-        setStatus(`Ai introdus ${values.length} valori. In modul normal poti rula intre ${MIN_VALUES}-${MAX_VALUES}; pentru mai multe, incarca un fisier.`);
-      } else {
-        setStatus(`Setul din fisier trebuie sa aiba cel mult ${MAX_FILE_VALUES} valori. Ai ${values.length}.`);
-      }
+    const generalValidationMessage = validateRunInput(values, maxAllowed, source);
+    if (generalValidationMessage) {
+      setStatus(generalValidationMessage);
       return;
+    }
+    const skippedAlgorithms: Partial<Record<Algorithm, string>> = {};
+    const runnableAlgorithms = AVAILABLE_ALGORITHMS.filter((algorithm) => {
+      const validationMessage = validateRunInput(values, maxAllowed, source, algorithm);
+      if (validationMessage) {
+        skippedAlgorithms[algorithm] = validationMessage;
+        return false;
+      }
+      return true;
+    });
+    if (runnableAlgorithms.length === 0) {
+      setStatus('Niciun algoritm nu poate rula pentru setul curent de valori.');
+      setRuns(createInitialRuns());
+      setCurrentStep(0);
+      setHighestReachedStep(0);
+      setIsPlaying(false);
+      setIsStoppedManually(false);
+      setInspectNotice('');
+      return;
+    }
+    if (Object.keys(skippedAlgorithms).length > 0) {
+      const skippedNames = Object.keys(skippedAlgorithms)
+        .map((algorithm) => ALGORITHM_LABELS[algorithm as Algorithm])
+        .join(' si ');
+      const shouldContinue = window.confirm(
+        `${skippedNames} nu pot rula pe ${values.length} valori, deoarece accepta doar numar de valori egal cu o putere a lui 2.\n\nVrei sa continui cu algoritmii compatibili?`
+      );
+      if (!shouldContinue) {
+        setStatus(`Rularea a fost anulata. ${skippedNames} nu pot rula pe ${values.length} valori.`);
+        setRuns(createInitialRuns());
+        setCurrentStep(0);
+        setHighestReachedStep(0);
+        setIsPlaying(false);
+        setIsStoppedManually(false);
+        setInspectNotice('');
+        return;
+      }
     }
     setIsRunningAlgo(true);
     setStatus('');
@@ -1598,7 +1633,7 @@ function App() {
     setActiveHistoryEntryId(null);
     try {
       const responses = await Promise.allSettled(
-        AVAILABLE_ALGORITHMS.map((algorithm) => {
+        runnableAlgorithms.map((algorithm) => {
           return axios.post(`${ALGO_API}/api/sorting-networks/execute`, {
             values,
             algorithm,
@@ -1612,7 +1647,7 @@ function App() {
       const mismatched: string[] = [];
       const historyResults: HistoryResult[] = [];
       responses.forEach((res, idx) => {
-        const algorithm = AVAILABLE_ALGORITHMS[idx];
+        const algorithm = runnableAlgorithms[idx];
         if (res.status === 'fulfilled') {
           const data = res.value.data as ExecuteResponse;
           const metrics: SortingMetrics = data.metrics ?? {
@@ -1664,6 +1699,11 @@ function App() {
       if (failed.length > 0) {
         const mismatchText = mismatched.length > 0 ? ` ${mismatched.join('; ')}.` : '';
         setStatus(`Nu au rulat: ${failed.join(', ')}.${mismatchText}`);
+      } else if (Object.keys(skippedAlgorithms).length > 0) {
+        const skippedText = Object.entries(skippedAlgorithms)
+          .map(([algorithm, reason]) => `${algorithm}: ${reason}`)
+          .join(' ');
+        setStatus(`Algoritmi omisi pentru acest input: ${skippedText}`);
       }
     } catch (err: any) {
       setStatus(`Eroare executie: ${apiErrorMessage(err)}`);
