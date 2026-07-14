@@ -310,6 +310,27 @@ function apiErrorMessage(err: any) {
   return err?.response?.data?.message ?? err?.response?.data?.error ?? err?.message ?? String(err);
 }
 
+function responseErrorMessage(body: any, fallback: string) {
+  if (!body) {
+    return fallback;
+  }
+  if (typeof body === 'string') {
+    return body;
+  }
+  if (body.message) {
+    return String(body.message);
+  }
+  if (body.error) {
+    return String(body.error);
+  }
+  if (body.errors && typeof body.errors === 'object') {
+    return Object.entries(body.errors)
+      .map(([field, message]) => `${field}: ${message}`)
+      .join(', ');
+  }
+  return JSON.stringify(body);
+}
+
 function theoreticalComparisonsFor(algorithm: Algorithm, elementCount: number, fallback: number) {
   if (algorithm === 'BITONIC') {
     const log2 = Math.log2(elementCount);
@@ -1106,13 +1127,25 @@ function App() {
       ]);
       if (dashboardRes.ok) {
         setTeacherDashboard((await dashboardRes.json()) as TeacherDashboard);
+      } else {
+        const body = await dashboardRes.json().catch(() => null);
+        setStatus(`Eroare incarcare dashboard: ${responseErrorMessage(body, dashboardRes.statusText)}`);
       }
       if (classesRes.ok) {
         const classes = (await classesRes.json()) as ClassroomSummary[];
         setTeacherClasses(classes);
-        if (!selectedClassId && classes.length > 0) {
+        if (classes.length === 0) {
+          setSelectedClassId(null);
+          setClassStudents([]);
+          setClassAssignments([]);
+          setClassProgress([]);
+          setClassStats(null);
+        } else if (!selectedClassId || !classes.some((classroom) => classroom.id === selectedClassId)) {
           setSelectedClassId(classes[0].id);
         }
+      } else {
+        const body = await classesRes.json().catch(() => null);
+        setStatus(`Eroare incarcare clase: ${responseErrorMessage(body, classesRes.statusText)}`);
       }
     } catch (err) {
       setStatus(`Eroare classroom: ${String(err)}`);
@@ -1200,22 +1233,33 @@ function App() {
   }, [loadClassDetails, role, selectedClassId, token]);
 
   async function createClassroom() {
+    const trimmedName = className.trim();
+    const trimmedDescription = classDescription.trim();
+    if (!trimmedName) {
+      setStatus('Eroare creare clasa: numele clasei este obligatoriu.');
+      return;
+    }
     setIsClassroomLoading(true);
     try {
       const res = await fetch(`${CLASSROOM_API}/api/classes`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ name: className, description: classDescription }),
+        body: JSON.stringify({ name: trimmedName, description: trimmedDescription }),
       });
       const body = await res.json();
       if (!res.ok) {
-        setStatus(`Eroare creare clasa: ${JSON.stringify(body)}`);
+        setStatus(`Eroare creare clasa: ${responseErrorMessage(body, res.statusText)}`);
         return;
       }
+      const createdClass = body as ClassroomSummary;
       setClassName('');
       setClassDescription('');
-      setSelectedClassId((body as ClassroomSummary).id);
+      setTeacherClasses((prev) => [createdClass, ...prev.filter((classroom) => classroom.id !== createdClass.id)]);
+      setSelectedClassId(createdClass.id);
+      setStatus(`Clasa creata: ${createdClass.name}`);
       await loadTeacherData();
+    } catch (err) {
+      setStatus(`Eroare creare clasa: ${String(err)}`);
     } finally {
       setIsClassroomLoading(false);
     }
